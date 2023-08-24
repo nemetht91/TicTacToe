@@ -19,12 +19,8 @@ GRID_FILE = 'images/converted/grid.png'
 CROSS_FILE = 'images/converted/cross.png'
 O_FILE = 'images/converted/o.png'
 
-X_OFFSET = 200
-Y_OFFSET = 205
 X_CENTER = 282
 Y_CENTER = 333
-
-global_image_list = []
 
 
 class TicTacToeUi(tk.Tk):
@@ -34,21 +30,23 @@ class TicTacToeUi(tk.Tk):
         self.minsize(width=500, height=300)
         self.config(padx=50, pady=25)
         self.config(background=BACKGROUND_COLOR)
-        global_image_list.append(tk.PhotoImage(GRID_FILE))
-        # creating a container
+        self.container = self._create_container()
+        self.frames = {}
+        self._add_frames(self.container)
+        self.show_frame(StartPage)
+
+    def _create_container(self):
         container = tk.Frame(self)
         container.grid(row=0, sticky="nsew")
-        #container.pack(side="top", fill="both", expand=True)
-
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
+        return container
 
-        self.frames = {}
+    def _add_frames(self, container):
         for F in (StartPage, PlayersPage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky='nsew')
-        self.show_frame(StartPage)
 
     def show_frame(self, cont):
         frame = self.frames[cont]
@@ -64,23 +62,24 @@ class StartPage(tk.Frame):
         self.cross_image = ImageTk.PhotoImage(Image.open(CROSS_FILE))
         self.o_image = ImageTk.PhotoImage(Image.open(O_FILE))
         self.marks = []
+        self.create_title_label()
+        self.canvas = self.create_grid_canvas()
+        self.create_buttons(controller)
 
+    def create_title_label(self):
         title_label = tk.Label(self, text='Tic Tac Toe', font=tkfont.Font(family='MouldyCheeseRegular', size=44))
         title_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
         title_label.grid(row=0, column=1, padx=10, pady=10)
 
-        self.canvas = tk.Canvas(self, width=564, height=666)
-        self.canvas.bind('<ButtonPress>', self.mouse_click)
-        self.canvas.config(background=BACKGROUND_COLOR, highlightthickness=0)
-        self.canvas.create_image(X_CENTER, Y_CENTER, image=self.grid_image)
-        # self.canvas.create_image(X_CENTER, Y_CENTER, image=self.cross_image)
-        # self.canvas.create_image(X_CENTER - X_OFFSET, Y_CENTER - Y_OFFSET, image=self.cross_image)
-        # self.canvas.create_image(X_CENTER + X_OFFSET, Y_CENTER + Y_OFFSET, image=self.cross_image)
-        # self.canvas.create_image(X_CENTER + X_OFFSET, Y_CENTER - Y_OFFSET, image=self.o_image)
-        # self.canvas.create_image(X_CENTER - X_OFFSET, Y_CENTER + Y_OFFSET, image=self.o_image)
+    def create_grid_canvas(self):
+        canvas = tk.Canvas(self, width=564, height=666)
+        canvas.bind('<ButtonPress>', self.mouse_click)
+        canvas.config(background=BACKGROUND_COLOR, highlightthickness=0)
+        canvas.create_image(X_CENTER, Y_CENTER, image=self.grid_image)
+        canvas.grid(row=1, column=0, columnspan=3)
+        return canvas
 
-        self.canvas.grid(row=1, column=0, columnspan=3)
-
+    def create_buttons(self, controller):
         multi_player_button = tk.Button(self, text='Multi Player',
                                         font=tkfont.Font(family='MouldyCheeseRegular', size=15),
                                         command=lambda: controller.show_frame(PlayersPage))
@@ -104,10 +103,8 @@ class StartPage(tk.Frame):
         self.marks.append(new_mark)
 
     def clear_grid(self):
-        print("Clearing grid")
         for mark in self.marks:
             self.canvas.delete(mark)
-
 
     @staticmethod
     def create_grid():
@@ -136,12 +133,6 @@ class GamePage(tk.Frame):
         canvas = tk.Canvas(self, width=564, height=666)
         canvas.config(background=BACKGROUND_COLOR, highlightthickness=0)
         canvas.create_image(X_CENTER, Y_CENTER, image=self.grid_image)
-        canvas.create_image(X_CENTER, Y_CENTER, image=self.cross_image)
-
-        canvas.create_image(X_CENTER - X_OFFSET, Y_CENTER - Y_OFFSET, image=self.cross_image)
-        canvas.create_image(X_CENTER + X_OFFSET, Y_CENTER + Y_OFFSET, image=self.cross_image)
-        canvas.create_image(X_CENTER + X_OFFSET, Y_CENTER - Y_OFFSET, image=self.o_image)
-        canvas.create_image(X_CENTER - X_OFFSET, Y_CENTER + Y_OFFSET, image=self.o_image)
 
         canvas.grid(row=1, column=0, columnspan=3)
 
@@ -187,7 +178,6 @@ class PlayersPage(tk.Frame):
         start_button = tk.Button(self, text='Start', font=tkfont.Font(family='MouldyCheeseRegular', size=18))
         start_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
         start_button.grid(row=4, column=3)
-
 
 
 app = TicTacToeUi()
