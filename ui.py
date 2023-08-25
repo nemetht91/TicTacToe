@@ -1,10 +1,12 @@
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
 import tkinter.font as tkfont
 import pyglet
 from PIL import Image, ImageTk
 from game_grid import GameGrid
+from player import Player
+from mark import Mark
+from game_logic import GameLogic
 
 pyglet.options['win32_gdi_font'] = True
 font_path = Path(__file__).parent / 'fonts/MouldyCheeseRegular-WyMWG.ttf'
@@ -43,7 +45,7 @@ class TicTacToeUi(tk.Tk):
         return container
 
     def _add_frames(self, container):
-        for F in (StartPage, PlayersPage):
+        for F in (StartPage, PlayersPage, GamePage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky='nsew')
@@ -56,7 +58,6 @@ class TicTacToeUi(tk.Tk):
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-        self.game_grid = self.create_grid()
         self.config(background=BACKGROUND_COLOR)
         self.grid_image = ImageTk.PhotoImage(Image.open(GRID_FILE))
         self.cross_image = ImageTk.PhotoImage(Image.open(CROSS_FILE))
@@ -70,41 +71,161 @@ class StartPage(tk.Frame):
         title_label = tk.Label(self, text='Tic Tac Toe', font=tkfont.Font(family='MouldyCheeseRegular', size=44))
         title_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
         title_label.grid(row=0, column=1, padx=10, pady=10)
+        welcome_label = tk.Label(self, text="Welcome! Please select a mode.",
+                                 font=tkfont.Font(family='MouldyCheeseRegular', size=18))
+        welcome_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
+        welcome_label.grid(row=1, column=1, padx=10, pady=10)
+
+    def create_grid_canvas(self):
+        canvas = tk.Canvas(self, width=564, height=666)
+        canvas.config(background=BACKGROUND_COLOR, highlightthickness=0)
+        canvas.create_image(X_CENTER, Y_CENTER, image=self.grid_image)
+        canvas.grid(row=2, column=0, columnspan=3)
+        return canvas
+
+    def create_buttons(self, controller):
+        multi_player_button = tk.Button(self, text='Multi Player',
+                                        font=tkfont.Font(family='MouldyCheeseRegular', size=15),
+                                        command=lambda: controller.show_frame(GamePage))
+        multi_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
+        multi_player_button.grid(column=0, row=3)
+
+        one_player_button = tk.Button(self, text='Single Player',
+                                      font=tkfont.Font(family='MouldyCheeseRegular', size=15))
+        one_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
+        one_player_button.grid(column=2, row=3)
+
+
+class GamePage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.game_grid = self.create_grid()
+        self.config(background=BACKGROUND_COLOR)
+        self.grid_image = ImageTk.PhotoImage(Image.open(GRID_FILE))
+        self.cross_image = ImageTk.PhotoImage(Image.open(CROSS_FILE))
+        self.o_image = ImageTk.PhotoImage(Image.open(O_FILE))
+        self.cross_mark = Mark(1, self.cross_image)
+        self.o_mark = Mark(2, self.o_image)
+        self.player1 = Player("Player 1", self.cross_mark)
+        self.player2 = Player("Player 2", self.o_mark)
+        self.current_player = self.player1
+        self.marks = []
+        self.create_title_label()
+        self.player1_label = self.create_player1_label()
+        self.player2_label = self.create_player2_label()
+        self.current_player_label = self.create_current_player_label()
+        self.canvas = self.create_grid_canvas()
+        self.create_buttons(controller)
+        self.game = GameLogic(3)
+        self.game_over = False
+
+    def create_title_label(self):
+        title_label = tk.Label(self, text='Tic Tac Toe', font=tkfont.Font(family='MouldyCheeseRegular', size=44))
+        title_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
+        title_label.grid(row=0, column=1, padx=10, pady=10)
+
+    def create_player1_label(self):
+        player1_label = tk.Label(self, text=f"{self.player1.name}: {self.player1.score}",
+                                 font=tkfont.Font(family='MouldyCheeseRegular', size=18))
+        player1_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
+        player1_label.grid(row=1, column=0, padx=10, pady=10)
+        return player1_label
+
+    def create_player2_label(self):
+        player2_label = tk.Label(self, text=f"{self.player2.name}: {self.player2.score}",
+                                 font=tkfont.Font(family='MouldyCheeseRegular', size=18))
+        player2_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
+        player2_label.grid(row=1, column=2, padx=10, pady=10)
+        return player2_label
+
+    def create_current_player_label(self):
+        current_player_label = tk.Label(self, text=f"{self.current_player.name}",
+                                        font=tkfont.Font(family='MouldyCheeseRegular', size=18))
+        current_player_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
+        current_player_label.grid(row=3, column=1)
+        return current_player_label
 
     def create_grid_canvas(self):
         canvas = tk.Canvas(self, width=564, height=666)
         canvas.bind('<ButtonPress>', self.mouse_click)
         canvas.config(background=BACKGROUND_COLOR, highlightthickness=0)
         canvas.create_image(X_CENTER, Y_CENTER, image=self.grid_image)
-        canvas.grid(row=1, column=0, columnspan=3)
+        canvas.grid(row=2, column=0, columnspan=3, padx=10)
         return canvas
 
     def create_buttons(self, controller):
-        multi_player_button = tk.Button(self, text='Multi Player',
-                                        font=tkfont.Font(family='MouldyCheeseRegular', size=15),
-                                        command=lambda: controller.show_frame(PlayersPage))
-        multi_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
-        multi_player_button.grid(column=0, row=3)
+        back_button = tk.Button(self, text='Back',
+                                font=tkfont.Font(family='MouldyCheeseRegular', size=15),
+                                command=lambda: self.back_to_home(controller))
+        back_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
+        back_button.grid(column=0, row=3)
 
-        one_player_button = tk.Button(self, text='Single Player',
-                                      font=tkfont.Font(family='MouldyCheeseRegular', size=15),
-                                      command=self.clear_grid)
-        one_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
-        one_player_button.grid(column=2, row=3)
+        new_game_button = tk.Button(self, text='New Game',
+                                    font=tkfont.Font(family='MouldyCheeseRegular', size=15),
+                                    command=self.new_game)
+        new_game_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
+        new_game_button.grid(column=2, row=3)
 
     def mouse_click(self, e):
+        if self.game_over:
+            return
         block = self.game_grid.which_block(e.x, e.y)
-        if block:
-            self.add_cross(block[0], block[1])
+        if not block:
+            return
+        is_valid = self.game.add_mark(self.current_player.mark.value, block[1], block[0])
+        if not is_valid:
+            return
+        self.add_mark(block[0], block[1])
+        self.check_game_over()
 
-    def add_cross(self, row, column):
+    def add_mark(self, row, column):
         x_cord, y_cord = self.game_grid.get_block_center(row, column)
-        new_mark = self.canvas.create_image(x_cord, y_cord, image=self.cross_image)
+        new_mark = self.canvas.create_image(x_cord, y_cord, image=self.current_player.mark.image)
         self.marks.append(new_mark)
 
     def clear_grid(self):
         for mark in self.marks:
             self.canvas.delete(mark)
+
+    def change_current_player(self):
+        if self.current_player == self.player1:
+            self.current_player = self.player2
+        else:
+            self.current_player = self.player1
+        self.update_labels()
+
+    def check_game_over(self):
+        if self.game.is_won():
+            self.current_player.increment_score()
+            self.current_player_label.config(text=f"{self.current_player.name} won")
+            self.game_over = True
+        elif self.game.is_grid_full():
+            self.current_player_label.config(text=f"It's a draw")
+            self.game_over = True
+        else:
+            self.change_current_player()
+
+    def new_game(self):
+        self.clear_grid()
+        self.game.reset_grid()
+        self.update_labels()
+        self.game_over = False
+
+    def update_labels(self):
+        self.player1_label.config(text=f"{self.player1.name}: {self.player1.score}")
+        self.player2_label.config(text=f"{self.player2.name}: {self.player2.score}")
+        self.current_player_label.config(text=f"{self.current_player.name}")
+
+    def back_to_home(self, controller):
+        self.reset_frame()
+        controller.show_frame(StartPage)
+
+    def reset_frame(self):
+        self.new_game()
+        self.player1.score = 0
+        self.player2.score = 0
+        self.current_player = self.player1
+        self.update_labels()
 
     @staticmethod
     def create_grid():
@@ -117,35 +238,6 @@ class StartPage(tk.Frame):
             block_height=163,
             frame_width=36
         )
-
-
-class GamePage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.config(background=BACKGROUND_COLOR)
-        self.grid_image = ImageTk.PhotoImage(Image.open(GRID_FILE))
-        self.cross_image = ImageTk.PhotoImage(Image.open(CROSS_FILE))
-        self.o_image = ImageTk.PhotoImage(Image.open(O_FILE))
-        title_label = tk.Label(self, text='Tic Tac Toe', font=tkfont.Font(family='MouldyCheeseRegular', size=44))
-        title_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
-        title_label.grid(row=0, column=1, padx=10, pady=10)
-
-        canvas = tk.Canvas(self, width=564, height=666)
-        canvas.config(background=BACKGROUND_COLOR, highlightthickness=0)
-        canvas.create_image(X_CENTER, Y_CENTER, image=self.grid_image)
-
-        canvas.grid(row=1, column=0, columnspan=3)
-
-        multi_player_button = tk.Button(self, text='Multi Player',
-                                        font=tkfont.Font(family='MouldyCheeseRegular', size=15),
-                                        command=lambda: controller.show_frame(PlayersPage))
-        multi_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
-        multi_player_button.grid(column=0, row=3)
-
-        one_player_button = tk.Button(self, text='Single Player',
-                                      font=tkfont.Font(family='MouldyCheeseRegular', size=15))
-        one_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
-        one_player_button.grid(column=2, row=3)
 
 
 class PlayersPage(tk.Frame):

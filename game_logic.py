@@ -17,23 +17,15 @@ class GameLogic:
     def __init__(self, grid_size):
         self.grid_size = grid_size
         self.grid = np.zeros((self.grid_size, self.grid_size), dtype=int)
-        self.cross = 1
-        self.o = 2
         self.mark_counter = 0
         self.max_marks = grid_size**2
         self.last_mark = Mark()
 
     def reset_grid(self):
         self.grid = np.zeros((self.grid_size, self.grid_size), dtype=int)
-        self.max_marks = 0
+        self.mark_counter = 0
 
-    def add_cross(self, row, column):
-        return self._add_to_grid(self.cross, row, column)
-
-    def add_o(self, row, column):
-        return self._add_to_grid(self.o, row, column)
-
-    def _add_to_grid(self, value, row, column):
+    def add_mark(self, value, row, column):
         if not self._is_valid(row, column):
             return False
         if self._get_current_value(row, column) != 0:
@@ -44,9 +36,9 @@ class GameLogic:
         return True
 
     def _is_valid(self, row, column):
-        if 0 > row > self.grid_size:
+        if 0 > row or row >= self.grid_size:
             return False
-        if 0 > column > self.grid_size:
+        if 0 > column or column >= self.grid_size:
             return False
         return True
 
@@ -67,13 +59,13 @@ class GameLogic:
 
     def is_row_won(self):
         current_row = self.grid[self.last_mark.row, :]
-        if np.all(current_row) == self.last_mark.value:
+        if np.all(current_row == self.last_mark.value):
             return True
         return False
 
     def is_column_won(self):
         current_column = self.grid[:, self.last_mark.column]
-        if np.all(current_column) == self.last_mark.value:
+        if np.all(current_column == self.last_mark.value):
             return True
         return False
 
@@ -82,9 +74,9 @@ class GameLogic:
             return False
         diagonal = self.grid.diagonal()
         flipped_diagonal = np.fliplr(self.grid).diagonal()
-        if np.all(diagonal) == self.last_mark.value:
+        if np.all(diagonal == self.last_mark.value):
             return True
-        if np.all(flipped_diagonal) == self.last_mark.value:
+        if np.all(flipped_diagonal == self.last_mark.value):
             return True
         return False
 
@@ -100,11 +92,3 @@ class GameLogic:
     def print_grid(self):
         print(self.grid)
 
-
-game = GameLogic(3)
-game.add_cross(0, 2)
-game.add_cross(1, 1)
-game.add_cross(2, 0)
-game.print_grid()
-game.is_grid_full()
-print(game.is_won())
