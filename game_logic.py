@@ -59,15 +59,11 @@ class GameLogic:
 
     def is_row_won(self):
         current_row = self.grid[self.last_mark.row, :]
-        if np.all(current_row == self.last_mark.value):
-            return True
-        return False
+        return np.all(current_row == self.last_mark.value)
 
     def is_column_won(self):
         current_column = self.grid[:, self.last_mark.column]
-        if np.all(current_column == self.last_mark.value):
-            return True
-        return False
+        return np.all(current_column == self.last_mark.value)
 
     def is_diagonal_won(self):
         if not self.is_on_diagonal():
