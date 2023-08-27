@@ -4,9 +4,10 @@ import tkinter.font as tkfont
 import pyglet
 from PIL import Image, ImageTk
 from game_grid import GameGrid
-from player import Player
+from player import Player, GpuPlayer
 from mark import Mark
 from game_logic import GameLogic
+import time
 
 pyglet.options['win32_gdi_font'] = True
 font_path = Path(__file__).parent / 'fonts/MouldyCheeseRegular-WyMWG.ttf'
@@ -33,6 +34,7 @@ class TicTacToeUi(tk.Tk):
         self.config(padx=50, pady=25)
         self.config(background=BACKGROUND_COLOR)
         self.container = self._create_container()
+        self.mode = 0
         self.frames = {}
         self._add_frames(self.container)
         self.show_frame(StartPage)
@@ -52,7 +54,14 @@ class TicTacToeUi(tk.Tk):
 
     def show_frame(self, cont):
         frame = self.frames[cont]
+        frame.event_generate("<<ShowFrame>>")
         frame.tkraise()
+
+    def set_single_player(self):
+        self.mode = 1
+
+    def set_multiplayer(self):
+        self.mode = 2
 
 
 class StartPage(tk.Frame):
@@ -86,19 +95,29 @@ class StartPage(tk.Frame):
     def create_buttons(self, controller):
         multi_player_button = tk.Button(self, text='Multi Player',
                                         font=tkfont.Font(family='MouldyCheeseRegular', size=15),
-                                        command=lambda: controller.show_frame(GamePage))
+                                        command=lambda: self.multi_player(controller))
         multi_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
         multi_player_button.grid(column=0, row=3)
 
         one_player_button = tk.Button(self, text='Single Player',
-                                      font=tkfont.Font(family='MouldyCheeseRegular', size=15))
+                                      font=tkfont.Font(family='MouldyCheeseRegular', size=15),
+                                      command=lambda: self.single_player(controller))
         one_player_button.config(background=BUTTON_COLOR, foreground=FONT_COLOR)
         one_player_button.grid(column=2, row=3)
+
+    def single_player(self, controller):
+        controller.set_single_player()
+        controller.show_frame(GamePage)
+
+    def multi_player(self, controller):
+        controller.set_multiplayer()
+        controller.show_frame(GamePage)
 
 
 class GamePage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.controller = controller
         self.game_grid = self.create_grid()
         self.config(background=BACKGROUND_COLOR)
         self.grid_image = ImageTk.PhotoImage(Image.open(GRID_FILE))
@@ -106,8 +125,9 @@ class GamePage(tk.Frame):
         self.o_image = ImageTk.PhotoImage(Image.open(O_FILE))
         self.cross_mark = Mark(1, self.cross_image)
         self.o_mark = Mark(2, self.o_image)
+        self.game = GameLogic(3)
         self.player1 = Player("Player 1", self.cross_mark)
-        self.player2 = Player("Player 2", self.o_mark)
+        self.player2 = self.create_player2()
         self.current_player = self.player1
         self.marks = []
         self.create_title_label()
@@ -116,8 +136,16 @@ class GamePage(tk.Frame):
         self.current_player_label = self.create_current_player_label()
         self.canvas = self.create_grid_canvas()
         self.create_buttons(controller)
-        self.game = GameLogic(3)
         self.game_over = False
+        self.bind("<<ShowFrame>>", self.on_show_page)
+
+    def on_show_page(self, event):
+        self.init_game()
+
+    def create_player2(self):
+        if self.controller.mode == 1:
+            return GpuPlayer(mark=self.o_mark, game=self.game)
+        return Player("Player 2", self.o_mark)
 
     def create_title_label(self):
         title_label = tk.Label(self, text='Tic Tac Toe', font=tkfont.Font(family='MouldyCheeseRegular', size=44))
@@ -172,16 +200,31 @@ class GamePage(tk.Frame):
         block = self.game_grid.which_block(e.x, e.y)
         if not block:
             return
-        is_valid = self.game.add_mark(self.current_player.mark.value, block[1], block[0])
+        print(f"Player mark:{block[0], block[1]}")
+        is_valid = self.add_mark(block[0], block[1])
         if not is_valid:
             return
-        self.add_mark(block[0], block[1])
         self.check_game_over()
+        if self.controller.mode == 1:
+            self.computer_turn()
+
+    def computer_turn(self):
+        if not self.game_over:
+            # time.sleep(1)
+            cpu_mark = self.player2.place_mark()
+            print(f"Cpu mark : {cpu_mark}")
+            self.add_mark(cpu_mark[0], cpu_mark[1])
+            self.check_game_over()
+            self.game.print_grid()
 
     def add_mark(self, row, column):
+        is_valid = self.game.add_mark(self.current_player.mark.value, row, column)
+        if not is_valid:
+            return False
         x_cord, y_cord = self.game_grid.get_block_center(row, column)
         new_mark = self.canvas.create_image(x_cord, y_cord, image=self.current_player.mark.image)
         self.marks.append(new_mark)
+        return True
 
     def clear_grid(self):
         for mark in self.marks:
@@ -205,11 +248,21 @@ class GamePage(tk.Frame):
         else:
             self.change_current_player()
 
+    def init_game(self):
+        self.player2 = self.create_player2()
+        self.update_labels()
+        self.clear_grid()
+        self.game.reset_grid()
+        self.game_over = False
+
     def new_game(self):
         self.clear_grid()
         self.game.reset_grid()
         self.update_labels()
         self.game_over = False
+        self.change_current_player()
+        if self.controller.mode == 1 and self.current_player == self.player2:
+            self.computer_turn()
 
     def update_labels(self):
         self.player1_label.config(text=f"{self.player1.name}: {self.player1.score}")
@@ -232,8 +285,8 @@ class GamePage(tk.Frame):
         return GameGrid(
             rows=3,
             columns=3,
-            row_offset=0,
-            column_offset=50,
+            row_offset=50,
+            column_offset=0,
             block_width=163,
             block_height=163,
             frame_width=36
@@ -255,7 +308,7 @@ class PlayersPage(tk.Frame):
         player1_details = tk.Entry(self, width=20, show='Player 1')
         player1_details.grid(row=1, column=1)
 
-        player2_label = tk.Label(self, text='Player 2 name: ',  font=tkfont.Font(family='MouldyCheeseRegular', size=15))
+        player2_label = tk.Label(self, text='Player 2 name: ', font=tkfont.Font(family='MouldyCheeseRegular', size=15))
         player2_label.config(background=BACKGROUND_COLOR, foreground=FONT_COLOR)
         player2_label.grid(row=2, column=0)
 

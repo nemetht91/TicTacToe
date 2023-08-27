@@ -10,12 +10,12 @@ class GameGrid:
         self.frame_width = frame_width
 
     def which_block(self, x, y):
-        x = x - self.row_offset
-        y = y - self.column_offset
+        x = x - self.column_offset
+        y = y - self.row_offset
         if not self._is_on_block(x, y):
             return None
-        row = x // (self.block_width + self.frame_width)
-        column = y // (self.block_height + self.frame_width)
+        column = x // (self.block_width + self.frame_width)
+        row = y // (self.block_height + self.frame_width)
         block = (row, column)
         return block
 
@@ -49,7 +49,7 @@ class GameGrid:
         return self.columns * (self.block_height + self.frame_width) - self.frame_width
 
     def get_block_center(self, row, column):
-        x_cord = (1 + 2 * row) * self.block_width/2 + row * self.frame_width + self.row_offset
-        y_cord = (1 + 2 * column) * self.block_height/2 + column * self.frame_width + self.column_offset
+        x_cord = (1 + 2 * column) * self.block_width/2 + column * self.frame_width + self.column_offset
+        y_cord = (1 + 2 * row) * self.block_height/2 + row * self.frame_width + self.row_offset
         return x_cord, y_cord
 

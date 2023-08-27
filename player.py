@@ -26,14 +26,21 @@ class GpuPlayer(Player):
         self.gpu_last_move = None
 
     def place_mark(self):
-        self.gpu_last_move = self._decision()
-        return self.gpu_last_move
+        new_move = self._decision()
+        self._validate_move(new_move)
+        self.gpu_last_move = new_move
+        return new_move
+
+    def _validate_move(self, move):
+        if not self._is_free(move[0], move[1]):
+            raise GpuPlayerException(f'Bad decision. Selected place is not empty: {move}')
 
     def _decision(self):
         if self._is_first_round():
             return self._first_move()
         if self._is_second_round():
             return self._second_move()
+        return self._move()
 
     def _is_first_round(self):
         if self.game.mark_counter <= 1:
@@ -55,6 +62,24 @@ class GpuPlayer(Player):
             if self._is_last_center():
                 return self._place_opposite_corner()
             return self._place_in_neighbour_corner()
+        block = self._need_to_block()
+        if block:
+            return block
+        winning_mark = self._can_win()
+        if winning_mark:
+            return winning_mark
+        return self._place_in_random_empty()
+
+    def _move(self):
+        winning_mark = self._can_win()
+        print(f"winning mark: {winning_mark}")
+        if winning_mark:
+            return winning_mark
+        block = self._need_to_block()
+        print(f"blocking mark: {block}")
+        if block:
+            return block
+        return self._place_in_random_empty()
 
     def _is_gpu_starts(self):
         if self.game.mark_counter == 0:
@@ -108,6 +133,13 @@ class GpuPlayer(Player):
         column_id = random.choice(corner_ids)
         return row_id, column_id
 
+    def _place_in_random_empty(self):
+        empties = self._get_empty_places()
+        if not empties:
+            raise GpuPlayerException('No more empty places')
+        place = random.choice(empties)
+        return place[0], place[1]
+
     def _is_free(self, row, column):
         return self.game.grid[row, column] == 0
 
@@ -118,6 +150,77 @@ class GpuPlayer(Player):
             if self._is_free(corner[0], corner[1]):
                 free_corners.append(corner)
         return free_corners
+
+    def _need_to_block(self):
+        opponent_mark = self.game.last_mark.value
+        return self._check_grid(opponent_mark)
+
+    def _can_win(self):
+        print(self.mark.value)
+        return self._check_grid(self.mark.value)
+
+    def _check_grid(self, mark):
+        in_row = self._check_rows(mark)
+        if in_row:
+            return in_row
+        in_column = self._check_columns(mark)
+        if in_column:
+            return in_column
+        in_diagonal = self._check_diagonals(mark)
+        if in_diagonal:
+            return in_diagonal
+        return None
+
+    def _check_rows(self, mark):
+        rows = [self.game.grid[i, :] for i in range(3)]
+        for i, row in enumerate(rows):
+            print(f"Row: {row}")
+            if self._is_one_away(row, mark):
+                empty_id = self._get_empty_id(row)
+                return i, empty_id
+        return None
+
+    def _check_columns(self, mark):
+        columns = [self.game.grid[:, i] for i in range(3)]
+        for i, column in enumerate(columns):
+            print(f"Column: {column}")
+            if self._is_one_away(column, mark):
+                empty_id = self._get_empty_id(column)
+                return empty_id, i
+        return None
+
+    def _check_diagonals(self, mark):
+        diagonal = self.game.grid.diagonal()
+        if self._is_one_away(diagonal, mark):
+            empty_id = self._get_empty_id(diagonal)
+            return empty_id, empty_id
+        flipped_diagonal = np.fliplr(self.game.grid).diagonal()
+        if self._is_one_away(flipped_diagonal, mark):
+            empty_id = self._get_empty_id(flipped_diagonal)
+            ids = [(0, 2), (1, 1), (2, 0)]
+            return ids[empty_id]
+        return None
+
+    @staticmethod
+    def _is_one_away(values, mark):
+        marks = 0
+        zeros = 0
+        for value in values:
+            if value == mark:
+                marks += 1
+            elif value == 0:
+                zeros += 1
+        print(f"mark count: {marks}: zero count: {zeros}")
+        if marks == 2 and zeros == 1:
+            return True
+        return False
+
+    @staticmethod
+    def _get_empty_id(values):
+        for i, value in enumerate(values):
+            if value == 0:
+                return i
+        raise ValueError('No empty value')
 
     @staticmethod
     def _is_neighbour(corner1, corner2):
@@ -134,20 +237,27 @@ class GpuPlayer(Player):
         column = self.game.grid[:, corner1[1]]
         return column[1] == 0
 
+    def _get_empty_places(self):
+        empty_places = []
+        for i, row in enumerate(self.game.grid):
+            for j in row:
+                if self.game.grid[i, j] == 0:
+                    empty_places.append([i, j])
+        return empty_places
+
 
 class GpuPlayerException(Exception):
-    def __init__(self, message, errors):
+    def __init__(self, message):
         super().__init__(message)
 
-        self.errors = errors
 
 
-test_game = GameLogic(3)
-test_computer = GpuPlayer(2, test_game)
-gpu_first = test_computer.place_mark()
-print(f"GPU first move: {gpu_first}")
-test_game.add_mark(2, gpu_first[0], gpu_first[1])
-test_game.add_mark(1, 1, 0)
-gpu_second = test_computer.place_mark()
-print(f"GPU second move: {gpu_second}")
-test_game.add_mark(2, gpu_second[0], gpu_second[1])
+# test_game = GameLogic(3)
+# test_computer = GpuPlayer(2, test_game)
+# gpu_first = test_computer.place_mark()
+# print(f"GPU first move: {gpu_first}")
+# test_game.add_mark(2, gpu_first[0], gpu_first[1])
+# test_game.add_mark(1, 1, 0)
+# gpu_second = test_computer.place_mark()
+# print(f"GPU second move: {gpu_second}")
+# test_game.add_mark(2, gpu_second[0], gpu_second[1])
